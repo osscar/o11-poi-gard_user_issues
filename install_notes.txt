@@ -107,5 +107,58 @@ Installation/migration notes for odoo11 running on an Ubuntu cloud instance:
     sudo vi /etc/odoo11-server.conf
 
     The file should look something like this (adapt to running environment):
+    
+    
+Tunning Up Odoo In Multiprocessing Server
+Odoo October 8, 2021 0 Terry
+
+By default, Odoo is working in multithreading mode. For production use, it is recommended to use the multiprocessing server as it increases stability, makes somewhat better use of computing resources and can be better monitored and resource-restricted.
+Worker number calculation
+
+    Rule of thumb : (#CPU * 2) + 1
+    Cron workers need CPU
+    1 worker ~= 6 concurrent users
+
+Memory Size Calculation
+
+    We consider 20% of the requests are heavy requests, while 80% are simpler ones
+    A heavy worker, when all computed field are well designed, SQL requests are well designed, is estimated to consume around 1GB of RAM
+    A lighter worker, in the same scenario, is estimated to consume around 150MB of RAM
+
+Needed RAM = #worker * ( (light_worker_ratio * light_worker_ram_estimation) + (heavy_worker_ratio * heavy_worker_ram_estimation) )
+
+If you do not know how many CPUs you have on your system, use the following grep command:
+
+# grep -c ^processor /proc/cpuinfo
+
+Let’s say you have a system with 4 CPU cores, 8 GB of RAM memory, and 30 concurrent Odoo users.
+
+    30 users / 6 = 5 (5 is theoretical number of workers needed )
+    (4 * 2) + 1 = 9 ( 9 is the theoretical maximum number of workers)
+
+Based on the calculation above, you can use 5 workers + 1 worker for the cron worker that is a total of 6 workers.
+
+Calculate the RAM memory consumption based on the number of workers:
+
+    RAM = 6 * ((0.8150) + (0.21024)) ~= 2 GB of RAM
+
+The calculation shows that the Odoo installation will need around 2GB of RAM.
+
+To switch to multiprocessing mode, open the configuration file and append the calculated values:
+
+Edit /etc/odoo-server.conf
+# sudo nano /etc/odoo-server.conf
+--start--
+limit_memory_hard = 2684354560
+limit_memory_soft = 2147483648
+limit_request = 8192
+limit_time_cpu = 600
+limit_time_real = 1200
+max_cron_threads = 1
+workers = 5
+--end--
+
+Restart the ODOO server to take effect.
+# sudo service odoo-server restart
    
    
